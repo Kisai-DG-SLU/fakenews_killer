@@ -234,6 +234,80 @@ timeout 5 pixi run streamlit run dashboard/app.py --server.headless true
 
 ---
 
+## ☸️ Déploiement Kubernetes (OKD)
+
+### Prérequis
+- Accès au cluster OKD (`oc login`)
+- Namespace `sophia-apps` existant ou droits pour créer
+
+### Fichiers de déploiement
+- `k8s/deployment.yaml` - Deployment + Service + Route
+- `Dockerfile` - Image avec Selenium/Chromium + pixi
+
+### Déploiement sur OKD
+
+```bash
+# 1. Se connecter
+oc login https://console.okd.sophia.kisai.fr:6443
+
+# 2. Créer le projet (si pas existant)
+oc new-project sophia-apps
+
+# 3. Déployer depuis le registry interne (BuildConfig)
+oc new-app -n sophia-apps \
+  --name=test-fakenews-killer \
+  --docker-image=selenium/standalone-chromium:latest \
+  --env=PIP_INSTALL_PIXI=1 \
+  https://forgejo-external.sophia-sandbox.svc.cluster.local/cyclopdev/fakenews_killer.git
+
+# 4. OU utiliser le Dockerfile local (après avoir push le Dockerfile)
+# Build manuel :
+oc start-build fakenews-killer --from-dir=. -n sophia-apps
+oc deploy fakenews-killer --latest -n sophia-apps
+```
+
+### Alternative : Déploiement direct via manifest
+
+```bash
+# Appliquer le manifest k8s/
+oc apply -n sophia-apps -f k8s/deployment.yaml
+```
+
+### Accéder au pod
+
+```bash
+# Shell interactif (pour lancer les cmds de démo)
+oc exec -n sophia-apps deploy/test-fakenews-killer -it -- /bin/sh
+
+# Voir les logs
+oc logs -n sophia-apps deploy/test-fakenews-killer -f
+
+# Accéder au dashboard Streamlit
+oc get route -n sophia-apps test-fakenews-killer
+# URL: https://test-fakenews-killer-sophia-apps.apps.okd.sophia.kisai.fr
+```
+
+### Commandes de démo dans le pod
+
+```bash
+# Extraction RSS
+pixi run python src/extraction/main.py
+
+# Pipeline + DB
+pixi run python src/transformation/pipeline.py --file data/raw/*.json
+
+# Dashboard Streamlit
+pixi run streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0
+
+# Stats DB
+pixi run python -c "
+from src.transformation.database import DatabaseManager
+print(DatabaseManager().get_statistics())
+"
+```
+
+---
+
 ## 📄 Licence
 
 MIT License
