@@ -1,0 +1,63 @@
+erDiagram
+    ARTICLE ||--o{ KEYWORD : has
+    ARTICLE }|..|{ SOURCE : comes_from
+    ARTICLE {
+        string id PK
+        string title
+        text description
+        text content
+        string url
+        string image_url
+        string source FK
+        string author
+        datetime published_at
+        datetime extracted_at
+        string type
+        string normalized_title
+        bool is_multimodal
+        int word_count
+    }
+    
+    SOURCE {
+        string id PK
+        string name
+        string type
+        string url
+        datetime last_fetch
+    }
+    
+    KEYWORD {
+        string id PK
+        string article_id FK
+        string word
+        int frequency
+    }
+    
+    EXTRACTION_LOG {
+        int id PK
+        string source
+        datetime start_time
+        datetime end_time
+        int articles_count
+        int errors_count
+        string status
+    }
+    
+    METRICS {
+        int id PK
+        datetime timestamp
+        string metric_name
+        float value
+        string unit
+    }
+
+    ARTICLE {
+        string source
+    }
+    SOURCE {
+        string id
+        string name
+    }
+
+    ARTICLE }|..|{ EXTRACTION_LOG : recorded_in
+    METRICS ||..|| EXTRACTION_LOG : tracks
