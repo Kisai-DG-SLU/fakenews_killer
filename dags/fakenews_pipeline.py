@@ -2,17 +2,15 @@
 DAG Airflow pour le pipeline d'extraction de données Fake News Killer.
 
 Flow: Extraction → Transformation → Stockage → Métriques
+Schedule: Toutes les 2 heures
 """
 
 from datetime import datetime, timedelta
 from airflow import DAG
-from airflow.operators.python import PythonOperator, BranchPythonOperator
-from airflow.operators.empty import EmptyOperator
-from airflow.utils.task_group import TaskGroup
-from airflow.models import Variable
+from airflow.providers.standard.operators.python import PythonOperator
+from airflow.sdk import TaskGroup
 import logging
 
-# Configuration
 DEFAULT_ARGS = {
     "owner": "CheckIt.AI",
     "depends_on_past": False,
@@ -30,7 +28,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def extract_rss(**context):
+def start_pipeline(ti):
+    """Point de départ - initialise le timestamp."""
+    ti.xcom_push(key="start_time", value=datetime.now().isoformat())
+    return "Pipeline started"
+
+
+def extract_rss(ti):
     """Tâche d'extraction RSS."""
     import sys
     sys.path.insert(0, PROJECT_DIR)
@@ -40,7 +44,6 @@ def extract_rss(**context):
     fetcher = RSSFetcher()
     articles = fetcher.fetch_all(limit_per_feed=15)
     
-    # Sauvegarde temporaire
     import json
     from datetime import datetime
     
@@ -52,14 +55,13 @@ def extract_rss(**context):
     
     logger.info(f"RSS: {len(articles)} articles extraits")
     
-    # Push vers XCom pour transmission
-    context["task_instance"].xcom_push(key="rss_count", value=len(articles))
-    context["task_instance"].xcom_push(key="rss_file", value=filepath)
+    ti.xcom_push(key="rss_count", value=len(articles))
+    ti.xcom_push(key="rss_file", value=filepath)
     
     return filepath
 
 
-def extract_reddit(**context):
+def extract_reddit(ti):
     """Tâche d'extraction Reddit."""
     import sys
     sys.path.insert(0, PROJECT_DIR)
@@ -84,23 +86,19 @@ def extract_reddit(**context):
     
     logger.info(f"Reddit: {len(all_posts)} posts extraits")
     
-    context["task_instance"].xcom_push(key="reddit_count", value=len(all_posts))
-    context["task_instance"].xcom_push(key="reddit_file", value=filepath)
+    ti.xcom_push(key="reddit_count", value=len(all_posts))
+    ti.xcom_push(key="reddit_file", value=filepath)
     
     return filepath
 
 
-def merge_raw_data(**context):
+def merge_raw_data(ti):
     """Fusionne les données brutes de toutes les sources."""
     import json
-    import glob
     import os
     
-    ti = context["task_instance"]
-    
-    # Récupère les fichiers des tâches précédentes
-    rss_file = ti.xcom_pull(key="rss_file", task_ids="extract_rss")
-    reddit_file = ti.xcom_pull(key="reddit_file", task_ids="extract_reddit")
+    rss_file = ti.xcom_pull(key="rss_file", task_id="extract_rss")
+    reddit_file = ti.xcom_pull(key="reddit_file", task_id="extract_reddit")
     
     all_articles = []
     
@@ -110,7 +108,6 @@ def merge_raw_data(**context):
                 articles = json.load(f)
                 all_articles.extend(articles)
     
-    # Merge
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     merged_file = f"{DATA_RAW}/merged_raw_{timestamp}.json"
     
@@ -119,13 +116,13 @@ def merge_raw_data(**context):
     
     logger.info(f"Merge: {len(all_articles)} articles au total")
     
-    context["task_instance"].xcom_push(key="merged_file", value=merged_file)
-    context["task_instance"].xcom_push(key="total_count", value=len(all_articles))
+    ti.xcom_push(key="merged_file", value=merged_file)
+    ti.xcom_push(key="total_count", value=len(all_articles))
     
     return merged_file
 
 
-def transform_data(**context):
+def transform_data(ti):
     """Tâche de transformation/ETL."""
     import sys
     sys.path.insert(0, PROJECT_DIR)
@@ -133,8 +130,7 @@ def transform_data(**context):
     from src.transformation.pipeline import TransformationPipeline
     from src.transformation.cleaner import DataValidator
     
-    ti = context["task_instance"]
-    merged_file = ti.xcom_pull(key="merged_file", task_ids="merge_raw")
+    merged_file = ti.xcom_pull(key="merged_file", task_id="merge_raw")
     
     if not merged_file:
         logger.error("Aucun fichier à transformer")
@@ -145,7 +141,6 @@ def transform_data(**context):
         output_dir=DATA_PROCESSED
     )
     
-    # Extraire le nom de fichier
     import os
     filename = os.path.basename(merged_file)
     
@@ -153,45 +148,57 @@ def transform_data(**context):
     transformed = pipeline.transform(articles)
     output_file = pipeline.save(transformed)
     
-    # Validation finale
     validation = DataValidator.validate_batch(transformed)
     
     logger.info(f"Transformation: {validation['valid']} valides, {validation['multimodal']} multimodaux")
     
-    context["task_instance"].xcom_push(key="transformed_file", value=output_file)
-    context["task_instance"].xcom_push(key="validation", value=validation)
+    ti.xcom_push(key="transformed_file", value=output_file)
+    ti.xcom_push(key="validation", value=validation)
     
     return output_file
 
 
-def load_to_database(**context):
-    """Tâche de chargement en base (simulation)."""
+def load_to_database(ti):
+    """Tâche de chargement en base SQLite."""
     import sys
     sys.path.insert(0, PROJECT_DIR)
     
-    ti = context["task_instance"]
-    transformed_file = ti.xcom_pull(key="transformed_file", task_ids="transform")
+    from src.transformation.database import DatabaseManager
     
-    logger.info(f"Chargement en base: {transformed_file}")
+    transformed_file = ti.xcom_pull(key="transformed_file", task_id="transform")
     
-    # Ici on pourrait ajouter SQLite/PostgreSQL
-    # import sqlite3
-    # conn = sqlite3.connect("fakenews.db")
+    if not transformed_file:
+        logger.warning("Aucun fichier à charger")
+        return "Skip"
     
-    return "Données chargées avec succès"
+    import json
+    with open(transformed_file, "r", encoding="utf-8") as f:
+        articles = json.load(f)
+    
+    db = DatabaseManager(f"{PROJECT_DIR}/data/fakenews.db")
+    count = db.insert_articles_batch(articles)
+    
+    logger.info(f"Base: {count} articles insérés")
+    
+    return f"Base mise à jour: {count} articles"
 
 
-def calculate_kpis(**context):
+def calculate_kpis(ti):
     """Calcule les KPIs."""
     import sys
     sys.path.insert(0, PROJECT_DIR)
     
-    ti = context["task_instance"]
+    rss_count = ti.xcom_pull(key="rss_count", task_id="extract_rss") or 0
+    reddit_count = ti.xcom_pull(key="reddit_count", task_id="extract_reddit") or 0
+    total_count = ti.xcom_pull(key="total_count", task_id="merge_raw") or 0
+    validation = ti.xcom_pull(key="validation", task_id="transform") or {}
     
-    rss_count = ti.xcom_pull(key="rss_count", task_ids="extract_rss") or 0
-    reddit_count = ti.xcom_pull(key="reddit_count", task_ids="extract_reddit") or 0
-    total_count = ti.xcom_pull(key="total_count", task_ids="merge_raw") or 0
-    validation = ti.xcom_pull(key="validation", task_ids="transform") or {}
+    start_time = ti.xcom_pull(key="start_time", task_id="start")
+    if start_time:
+        start_dt = datetime.fromisoformat(start_time)
+        exec_time = (datetime.now() - start_dt).total_seconds()
+    else:
+        exec_time = 0
     
     kpis = {
         "extraction_rss": rss_count,
@@ -201,10 +208,10 @@ def calculate_kpis(**context):
         "multimodal": validation.get("multimodal", 0),
         "text_only": validation.get("text_only", 0),
         "success_rate": validation.get("valid", 0) / max(total_count, 1) * 100,
+        "execution_time_seconds": round(exec_time, 1),
         "timestamp": datetime.now().isoformat()
     }
     
-    # Sauvegarde KPIs
     import json
     kpi_file = f"{DATA_PROCESSED}/kpis.json"
     
@@ -216,62 +223,52 @@ def calculate_kpis(**context):
     return kpis
 
 
-# Définition du DAG
 with DAG(
     dag_id="fakenews_etl_pipeline",
     default_args=DEFAULT_ARGS,
     description="Pipeline ETL pour l'extraction de données multimodales",
-    schedule_interval="0 6,18 * * *",  # 2 fois par jour (6h et 18h)
+    schedule="0 */2 * * *",
     start_date=datetime(2026, 4, 1),
     catchup=False,
     tags=["fakenews", "etl", "multimodal"]
 ) as dag:
     
-    # Point de départ
-    start = EmptyOperator(task_id="start")
+    start = PythonOperator(
+        task_id="start",
+        python_callable=start_pipeline
+    )
     
-    # ==================== EXTRACTION ====================
     with TaskGroup("extraction_group") as extraction:
         extract_rss = PythonOperator(
             task_id="extract_rss",
-            python_callable=extract_rss,
-            provide_context=True
+            python_callable=extract_rss
         )
         
         extract_reddit = PythonOperator(
             task_id="extract_reddit",
-            python_callable=extract_reddit,
-            provide_context=True
+            python_callable=extract_reddit
         )
         
         merge_raw = PythonOperator(
             task_id="merge_raw",
-            python_callable=merge_raw_data,
-            provide_context=True
+            python_callable=merge_raw_data
         )
         
         [extract_rss, extract_reddit] >> merge_raw
     
-    # ==================== TRANSFORMATION ====================
     transform = PythonOperator(
         task_id="transform",
-        python_callable=transform_data,
-        provide_context=True
+        python_callable=transform_data
     )
     
-    # ==================== CHARGEMENT ====================
     load = PythonOperator(
         task_id="load",
-        python_callable=load_to_database,
-        provide_context=True
+        python_callable=load_to_database
     )
     
-    # ==================== MONITORING ====================
     kpis = PythonOperator(
         task_id="calculate_kpis",
-        python_callable=calculate_kpis,
-        provide_context=True
+        python_callable=calculate_kpis
     )
     
-    # ==================== FLUX ====================
     start >> extraction >> transform >> load >> kpis

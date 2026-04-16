@@ -18,6 +18,7 @@ class RSSFetcher:
         "nouvel_obs": "https://www.nouvelobs.com/rss.xml",
         "20_minutes": "https://www.20minutes.fr/feeds/rss-une.xml",
         "euronews": "https://www.euronews.com/rss",
+        "breitbart": "https://feeds.feedburner.com/breitbart",
     }
     
     def __init__(self, feeds: Optional[dict[str, str]] = None):

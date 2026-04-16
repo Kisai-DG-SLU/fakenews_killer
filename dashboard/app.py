@@ -124,6 +124,19 @@ def main():
                 delta_color="normal"
             )
         
+        col1, col2 = st.columns(2)
+        with col1:
+            exec_time = kpis.get('execution_time_seconds', 0)
+            st.metric(
+                "Temps d'exécution",
+                f"{exec_time:.1f}s" if exec_time > 0 else "N/A"
+            )
+        with col2:
+            st.metric(
+                "Articles valides",
+                kpis.get('valid_after_clean', 0)
+            )
+        
         st.markdown("---")
         
         # Graphiques

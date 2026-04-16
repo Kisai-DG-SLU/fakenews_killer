@@ -27,7 +27,8 @@ class ContentClassifier:
         "sources_connues": [
             "le figaro", "le monde", "le point", "20 minutes",
             "france info", "france inter", "bfmtv", "euronews",
-            "reuters", "afp", "associated press", "bbc"
+            "reuters", "afp", "associated press", "bbc",
+            "nouvel obs", "lobs", "20 minutes"
         ]
     }
     
@@ -36,7 +37,8 @@ class ContentClassifier:
         "alerte": [
             "urgent", "breaking", "exclusif", "scandale",
             "choc", "incroyable", "inacceptable", "trahison",
-            "complot", "secret", "caché", "manipulation"
+            "complot", "secret", "caché", "manipulation",
+            "code red", "alerte maximale"
         ],
         "emotions": [
             "haine", "colère", "peur", "panique",
@@ -50,6 +52,10 @@ class ContentClassifier:
         "absence_verification": [
             "n'a pas pu être vérifié", "ne peut être confirmé",
             "en attente de vérification", "à confirmer"
+        ],
+        "sources_douteuses": [
+            "breitbart", "infowars", "gateway pundit",
+            "zerohedge", "alex jones", "rebel news"
         ]
     }
     
@@ -87,16 +93,16 @@ class ContentClassifier:
         disinfo_score = self._calculate_disinfo_score(text, source)
         
         # Détermination de la catégorie
-        if opinion_score > 0.6 and disinfo_score < 0.4:
+        if opinion_score > 0.3 and disinfo_score < 0.4:
             category = "opinion"
-            confidence = min(opinion_score, 1.0)
+            confidence = min(opinion_score + 0.2, 1.0)
             self.stats["opinion"] += 1
-        elif disinfo_score > 0.6:
+        elif disinfo_score > 0.5:
             category = "desinformation"
             confidence = min(disinfo_score, 1.0)
             self.stats["desinformation"] += 1
-        elif disinfo_score > 0.4:
-            category = "neutre"  # Suspicious but pas sûr
+        elif disinfo_score > 0.3 or opinion_score > 0.2:
+            category = "neutre"
             confidence = 0.5
             self.stats["neutre"] += 1
         else:
@@ -118,9 +124,12 @@ class ContentClassifier:
         score = 0.0
         factors = 0
         
+        # Normaliser source (remplacer _ par espace pour matcher)
+        source_normalized = source.lower().replace("_", " ")
+        
         # Source connue (média identifié)
         for known_source in self.OPINION_INDICATORS["sources_connues"]:
-            if known_source in source:
+            if known_source in source_normalized:
                 score += 0.3
                 factors += 1
                 break
@@ -171,6 +180,14 @@ class ContentClassifier:
         if any(d in source for d in suspicious_domains):
             score += 0.4
             factors += 1
+        
+        # Sources douteuses (listes connues de désinformation)
+        source_normalized = source.lower().replace("_", " ")
+        for doubtful_source in self.DISINFO_INDICATORS["sources_douteuses"]:
+            if doubtful_source in source_normalized:
+                score += 0.35
+                factors += 1
+                break
         
         return min(score, 1.0) if factors > 0 else 0.0
     
