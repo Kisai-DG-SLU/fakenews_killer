@@ -203,7 +203,7 @@ def main():
             
             st.dataframe(
                 df_raw[["title", "source", "type", "published_at"]].head(50),
-                use_container_width=True
+                width='stretch'
             )
     
     elif page == "Données transformées":
@@ -239,8 +239,8 @@ def main():
             st.dataframe(
                 df_transformed[[
                     "title", "source", "is_multimodal", "word_count", "keywords"
-                ]].head(50),
-                use_container_width=True
+                ]].head(100),
+                width='stretch'
             )
         
         # Tableau classification
@@ -251,15 +251,19 @@ def main():
             class_counts = df_class["category"].value_counts().reset_index()
             class_counts.columns = ["Catégorie", "Nombre"]
             
-            st.dataframe(class_counts, use_container_width=True)
+            st.dataframe(class_counts, width='stretch')
             
-            # Fiabilité par source
-            st.subheader("Fiabilité par source")
-            if "reliability" in df_class:
-                reliability_data = df_transformed.copy()
-                reliability_data["classification_category"] = df_class["category"]
-                rel_by_source = reliability_data.groupby("source")["classification_category"].value_counts().unstack(fill_value=0)
-                st.dataframe(rel_by_source, use_container_width=True)
+            # Stats nettoyés vs bruts
+            st.subheader("Articles nettoyés")
+            st.write(f"Bruts: {kpis.get('total_raw', 0)} → Valides: {kpis.get('valid_after_clean', 0)} ( rechaz és: {kpis.get('total_raw', 0) - kpis.get('valid_after_clean', 0)})")
+            
+            # Par source
+            st.subheader("Par source")
+            source_stats = df_transformed.groupby("source").agg({
+                "title": "count",
+                "is_multimodal": "sum"
+            }).rename(columns={"title": "Total", "is_multimodal": "Multimodal"})
+            st.dataframe(source_stats, width='stretch')
         else:
             st.info("Aucune classification disponible.")
     
