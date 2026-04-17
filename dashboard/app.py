@@ -159,13 +159,15 @@ def main():
         
         with col2:
             st.subheader("Sources d'extraction")
-            if kpis.get("total_raw", 0) > 0:
+            df = load_transformed_data()
+            if not df.empty and "source" in df.columns:
+                source_counts = df["source"].value_counts().reset_index()
+                source_counts.columns = ["Source", "Articles"]
+                st.bar_chart(source_counts.set_index("Source"))
+            elif kpis.get("total_raw", 0) > 0:
                 sources_data = pd.DataFrame({
                     "Source": ["RSS", "Reddit"],
-                    "Articles": [
-                        kpis.get("extraction_rss", 0),
-                        kpis.get("extraction_reddit", 0)
-                    ]
+                    "Articles": [kpis.get("extraction_rss", 0), kpis.get("extraction_reddit", 0)]
                 })
                 st.bar_chart(sources_data.set_index("Source"))
         
@@ -255,7 +257,7 @@ def main():
             
             # Stats nettoyés vs bruts
             st.subheader("Articles nettoyés")
-            st.write(f"Bruts: {kpis.get('total_raw', 0)} → Valides: {kpis.get('valid_after_clean', 0)} ( rechaz és: {kpis.get('total_raw', 0) - kpis.get('valid_after_clean', 0)})")
+            st.write(f"Bruts: {int(kpis.get('total_raw', 0))} → Valides: {int(kpis.get('valid_after_clean', 0))} (rejet és: {int(kpis.get('total_raw', 0) - kpis.get('valid_after_clean', 0)))")
             
             # Par source
             st.subheader("Par source")
