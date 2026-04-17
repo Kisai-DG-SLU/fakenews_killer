@@ -159,33 +159,67 @@ def extract_scraper_bs4(ti):
 
 
 def extract_scraper_selenium(ti):
-    """Tâche d'extraction via Selenium (Le Monde test)."""
+    """Tâche d'extraction via Selenium (Le Monde)."""
     import sys
     sys.path.insert(0, PROJECT_DIR)
-    
-    try:
-        from src.extraction.scraper_selenium import SeleniumScraper
-        
-        scraper = SeleniumScraper(output_dir=DATA_RAW, headless=True)
-        
-        selectors = {
-            "article": "article",
-            "title": "h3, .article-title",
-            "link": "a[href]",
-            "date": "time, .date"
-        }
-        
-        articles = scraper.scrape_site(
-            "https://www.lemonde.fr/",
-            selectors,
-            limit=10
-        )
-    except Exception as e:
-        logger.warning(f"Selenium error: {e}")
-        articles = []
-    
     import json
     from datetime import datetime
+    
+    articles = []
+    
+    try:
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        import time
+        
+        options = Options()
+        options.add_argument("--headless")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        
+        driver = webdriver.Chrome(options=options)
+        
+        driver.get("https://www.lemonde.fr/")
+        time.sleep(3)
+        
+        articles_elements = driver.find_elements(By.CSS_SELECTOR, "article.teaser")
+        
+        for elem in articles_elements[:10]:
+            try:
+                title = elem.find_element(By.CSS_SELECTOR, "h3").text
+                link = elem.find_element(By.CSS_SELECTOR, "a").get_attribute("href")
+                img = elem.find_element(By.CSS_SELECTOR, "img").get_attribute("src") if elem.find_elements(By.CSS_SELECTOR, "img") else ""
+                
+                if title and link:
+                    articles.append({
+                        "title": title,
+                        "description": "",
+                        "content": "",
+                        "url": link,
+                        "image_url": img,
+                        "source": "le_monde",
+                        "author": "",
+                        "published_at": datetime.now().isoformat(),
+                        "extracted_at": datetime.now().isoformat(),
+                        "type": "scraped_selenium"
+                    })
+            except:
+                continue
+        
+        driver.quit()
+        
+    except Exception as e:
+        logger.warning(f"Selenium error: {e}")
+        if driver:
+            try:
+                driver.quit()
+            except:
+                pass
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filepath = f"{DATA_RAW}/selenium_extract_{timestamp}.json"
@@ -193,7 +227,7 @@ def extract_scraper_selenium(ti):
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(articles, f, ensure_ascii=False)
     
-    logger.info(f"Selenium: {len(articles)} articles extraits")
+    logger.info(f"Selenium: {len(articles)} articles")
     
     ti.xcom_push(key="selenium_count", value=len(articles))
     ti.xcom_push(key="selenium_file", value=filepath)
@@ -202,33 +236,55 @@ def extract_scraper_selenium(ti):
 
 
 def extract_scraper_playwright(ti):
-    """Tâche d'extraction via Playwright (20 Minutes test)."""
+    """Tâche d'extraction via Playwright (20 Minutes)."""
     import sys
     sys.path.insert(0, PROJECT_DIR)
-    
-    try:
-        from src.extraction.scraper_playwright import PlaywrightScraper
-        
-        scraper = PlaywrightScraper(output_dir=DATA_RAW, headless=True)
-        
-        selectors = {
-            "article": "article",
-            "title": "h3, .article-title",
-            "link": "a[href]",
-            "date": "time, .date"
-        }
-        
-        articles = scraper.scrape_site(
-            "https://www.20minutes.fr/",
-            selectors,
-            limit=10
-        )
-    except Exception as e:
-        logger.warning(f"Playwright error: {e}")
-        articles = []
-    
     import json
     from datetime import datetime
+    
+    articles = []
+    
+    try:
+        from playwright.sync_api import sync_playwright
+        import time
+        
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            
+            page.goto("https://www.20minutes.fr/", timeout=15000)
+            time.sleep(2)
+            
+            articles_elem = page.query_selector_all("article")
+            
+            for elem in articles_elem[:10]:
+                try:
+                    title_elem = elem.query_selector("h2, h3, .title")
+                    link_elem = elem.query_selector("a")
+                    
+                    title = title_elem.inner_text() if title_elem else ""
+                    link = link_elem.get_attribute("href") if link_elem else ""
+                    
+                    if title and link:
+                        articles.append({
+                            "title": title.strip(),
+                            "description": "",
+                            "content": "",
+                            "url": link,
+                            "image_url": "",
+                            "source": "20_minutes",
+                            "author": "",
+                            "published_at": datetime.now().isoformat(),
+                            "extracted_at": datetime.now().isoformat(),
+                            "type": "scraped_playwright"
+                        })
+                except:
+                    continue
+            
+            browser.close()
+            
+    except Exception as e:
+        logger.warning(f"Playwright error: {e}")
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filepath = f"{DATA_RAW}/playwright_extract_{timestamp}.json"
@@ -236,7 +292,7 @@ def extract_scraper_playwright(ti):
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(articles, f, ensure_ascii=False)
     
-    logger.info(f"Playwright: {len(articles)} articles extraits")
+    logger.info(f"Playwright: {len(articles)} articles")
     
     ti.xcom_push(key="playwright_count", value=len(articles))
     ti.xcom_push(key="playwright_file", value=filepath)
