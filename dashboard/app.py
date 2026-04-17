@@ -12,8 +12,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # Configuration
-DATA_DIR = Path("/mnt/prod/data/processed")
-RAW_DIR = Path("/mnt/prod/data/raw")
+DATA_DIR = Path("/workspace/fakenews_killer/data/processed")
+RAW_DIR = Path("/workspace/fakenews_killer/data/raw")
 
 st.set_page_config(
     page_title="CheckIt.AI - Dashboard",
