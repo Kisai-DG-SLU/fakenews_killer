@@ -2,7 +2,7 @@
 authors = ["Damien GUESDON <kisai.dg.slu@gmail.com>"]
 channels = ["conda-forge"]
 name = "fakenews_killer"
-platforms = ["linux-64", "osx-64"]
+platforms = ["linux-64"]
 version = "0.1.0"
 
 [tasks]
@@ -12,12 +12,11 @@ fmt = "ruff format ."
 [dependencies]
 python = "3.10.*"
 beautifulsoup4 = "*"
-selenium = "*"
-selenium-manager = "*"
-playwright = "*"
-playwright-install = "*"
+selenium = ">=4.0"
+playwright = ">=1.40"
 requests = "*"
 lxml = "*"
+pyyaml = "*"
 airflow = "*"
 streamlit = "*"
 pandas = "*"
