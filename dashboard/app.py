@@ -258,9 +258,9 @@ def main():
             # Stats nettoyés vs bruts
             st.subheader("Articles nettoyés")
             bruts = int(kpis.get('total_raw', 0))
-valides = int(kpis.get('valid_after_clean', 0))
-rejetes = bruts - valides
-st.write(f"Bruts: {bruts} → Valides: {valides} (rejetés: {rejetes})")
+            valides = int(kpis.get('valid_after_clean', 0))
+            rejetes = bruts - valides
+            st.write(f"Bruts: {bruts} → Valides: {valides} (rejetés: {rejetes})")
             
             # Par source
             st.subheader("Par source")
