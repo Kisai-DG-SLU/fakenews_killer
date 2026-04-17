@@ -92,6 +92,72 @@ def extract_reddit(ti):
     return filepath
 
 
+def extract_hackernews(ti):
+    """Tâche d'extraction HackerNews."""
+    import sys
+    sys.path.insert(0, PROJECT_DIR)
+    
+    from src.extraction.api_client import HackerNewsClient
+    
+    client = HackerNewsClient()
+    articles = client.get_top_stories(limit=15)
+    
+    import json
+    from datetime import datetime
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filepath = f"{DATA_RAW}/hackernews_extract_{timestamp}.json"
+    
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(articles, f, ensure_ascii=False)
+    
+    logger.info(f"HackerNews: {len(articles)} articles extraits")
+    
+    ti.xcom_push(key="hackernews_count", value=len(articles))
+    ti.xcom_push(key="hackernews_file", value=filepath)
+    
+    return filepath
+
+
+def extract_scraper_bs4(ti):
+    """Tâche d'extraction via scraper BS4 (Le Figaro article test)."""
+    import sys
+    sys.path.insert(0, PROJECT_DIR)
+    
+    from src.extraction.scraper_bs4 import NewsScraper
+    
+    scraper = NewsScraper(output_dir=DATA_RAW)
+    
+    selectors = {
+        "article": "article",
+        "title": "h2, .article-title",
+        "link": "a[href]",
+        "date": "time, .date"
+    }
+    
+    articles = scraper.scrape_site(
+        "https://www.lefigaro.fr/",
+        selectors,
+        limit=15
+    )
+    
+    import json
+    from datetime import datetime
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filepath = f"{DATA_RAW}/bs4_extract_{timestamp}.json"
+    
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(articles, f, ensure_ascii=False)
+    
+    logger.info(f"BS4: {len(articles)} articles extraits")
+    
+    ti.xcom_push(key="bs4_count", value=len(articles))
+    ti.xcom_push(key="bs4_file", value=filepath)
+    
+    return filepath
+
+
 def merge_raw_data(ti):
     """Fusionne les données brutes de toutes les sources."""
     import json
@@ -99,10 +165,12 @@ def merge_raw_data(ti):
     
     rss_file = ti.xcom_pull(task_ids="extraction_group.extract_rss", key="rss_file")
     reddit_file = ti.xcom_pull(task_ids="extraction_group.extract_reddit", key="reddit_file")
+    hackernews_file = ti.xcom_pull(task_ids="extraction_group.extract_hackernews", key="hackernews_file")
+    bs4_file = ti.xcom_pull(task_ids="extraction_group.extract_scraper_bs4", key="bs4_file")
     
     all_articles = []
     
-    for filepath in [rss_file, reddit_file]:
+    for filepath in [rss_file, reddit_file, hackernews_file, bs4_file]:
         if filepath and os.path.exists(filepath):
             with open(filepath, "r", encoding="utf-8") as f:
                 articles = json.load(f)
@@ -190,6 +258,8 @@ def calculate_kpis(ti):
     
     rss_count = ti.xcom_pull(task_ids="extraction_group.extract_rss", key="rss_count") or 0
     reddit_count = ti.xcom_pull(task_ids="extraction_group.extract_reddit", key="reddit_count") or 0
+    hackernews_count = ti.xcom_pull(task_ids="extraction_group.extract_hackernews", key="hackernews_count") or 0
+    bs4_count = ti.xcom_pull(task_ids="extraction_group.extract_scraper_bs4", key="bs4_count") or 0
     total_count = ti.xcom_pull(task_ids="extraction_group.merge_raw", key="total_count") or 0
     validation = ti.xcom_pull(task_ids="transform", key="validation") or {}
     
@@ -203,6 +273,8 @@ def calculate_kpis(ti):
     kpis = {
         "extraction_rss": rss_count,
         "extraction_reddit": reddit_count,
+        "extraction_hackernews": hackernews_count,
+        "extraction_bs4": bs4_count,
         "total_raw": total_count,
         "valid_after_clean": validation.get("valid", 0),
         "multimodal": validation.get("multimodal", 0),
@@ -249,12 +321,22 @@ with DAG(
             python_callable=extract_reddit
         )
         
+        extract_hackernews = PythonOperator(
+            task_id="extract_hackernews",
+            python_callable=extract_hackernews
+        )
+        
+        extract_scraper_bs4 = PythonOperator(
+            task_id="extract_scraper_bs4",
+            python_callable=extract_scraper_bs4
+        )
+        
         merge_raw = PythonOperator(
             task_id="merge_raw",
             python_callable=merge_raw_data
         )
         
-        [extract_rss, extract_reddit] >> merge_raw
+        [extract_rss, extract_reddit, extract_hackernews, extract_scraper_bs4] >> merge_raw
     
     transform = PythonOperator(
         task_id="transform",
