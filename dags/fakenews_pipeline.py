@@ -138,7 +138,7 @@ def extract_scraper_bs4(ti):
     articles = scraper.scrape_site(
         "https://www.lefigaro.fr/",
         selectors,
-        limit=15
+        limit=10
     )
     
     import json
@@ -158,6 +158,92 @@ def extract_scraper_bs4(ti):
     return filepath
 
 
+def extract_scraper_selenium(ti):
+    """Tâche d'extraction via Selenium (Le Monde test)."""
+    import sys
+    sys.path.insert(0, PROJECT_DIR)
+    
+    try:
+        from src.extraction.scraper_selenium import SeleniumScraper
+        
+        scraper = SeleniumScraper(output_dir=DATA_RAW, headless=True)
+        
+        selectors = {
+            "article": "article",
+            "title": "h3, .article-title",
+            "link": "a[href]",
+            "date": "time, .date"
+        }
+        
+        articles = scraper.scrape_site(
+            "https://www.lemonde.fr/",
+            selectors,
+            limit=10
+        )
+    except Exception as e:
+        logger.warning(f"Selenium error: {e}")
+        articles = []
+    
+    import json
+    from datetime import datetime
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filepath = f"{DATA_RAW}/selenium_extract_{timestamp}.json"
+    
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(articles, f, ensure_ascii=False)
+    
+    logger.info(f"Selenium: {len(articles)} articles extraits")
+    
+    ti.xcom_push(key="selenium_count", value=len(articles))
+    ti.xcom_push(key="selenium_file", value=filepath)
+    
+    return filepath
+
+
+def extract_scraper_playwright(ti):
+    """Tâche d'extraction via Playwright (20 Minutes test)."""
+    import sys
+    sys.path.insert(0, PROJECT_DIR)
+    
+    try:
+        from src.extraction.scraper_playwright import PlaywrightScraper
+        
+        scraper = PlaywrightScraper(output_dir=DATA_RAW, headless=True)
+        
+        selectors = {
+            "article": "article",
+            "title": "h3, .article-title",
+            "link": "a[href]",
+            "date": "time, .date"
+        }
+        
+        articles = scraper.scrape_site(
+            "https://www.20minutes.fr/",
+            selectors,
+            limit=10
+        )
+    except Exception as e:
+        logger.warning(f"Playwright error: {e}")
+        articles = []
+    
+    import json
+    from datetime import datetime
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filepath = f"{DATA_RAW}/playwright_extract_{timestamp}.json"
+    
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(articles, f, ensure_ascii=False)
+    
+    logger.info(f"Playwright: {len(articles)} articles extraits")
+    
+    ti.xcom_push(key="playwright_count", value=len(articles))
+    ti.xcom_push(key="playwright_file", value=filepath)
+    
+    return filepath
+
+
 def merge_raw_data(ti):
     """Fusionne les données brutes de toutes les sources."""
     import json
@@ -167,10 +253,12 @@ def merge_raw_data(ti):
     reddit_file = ti.xcom_pull(task_ids="extraction_group.extract_reddit", key="reddit_file")
     hackernews_file = ti.xcom_pull(task_ids="extraction_group.extract_hackernews", key="hackernews_file")
     bs4_file = ti.xcom_pull(task_ids="extraction_group.extract_scraper_bs4", key="bs4_file")
+    selenium_file = ti.xcom_pull(task_ids="extraction_group.extract_scraper_selenium", key="selenium_file")
+    playwright_file = ti.xcom_pull(task_ids="extraction_group.extract_scraper_playwright", key="playwright_file")
     
     all_articles = []
     
-    for filepath in [rss_file, reddit_file, hackernews_file, bs4_file]:
+    for filepath in [rss_file, reddit_file, hackernews_file, bs4_file, selenium_file, playwright_file]:
         if filepath and os.path.exists(filepath):
             with open(filepath, "r", encoding="utf-8") as f:
                 articles = json.load(f)
@@ -260,6 +348,8 @@ def calculate_kpis(ti):
     reddit_count = ti.xcom_pull(task_ids="extraction_group.extract_reddit", key="reddit_count") or 0
     hackernews_count = ti.xcom_pull(task_ids="extraction_group.extract_hackernews", key="hackernews_count") or 0
     bs4_count = ti.xcom_pull(task_ids="extraction_group.extract_scraper_bs4", key="bs4_count") or 0
+    selenium_count = ti.xcom_pull(task_ids="extraction_group.extract_scraper_selenium", key="selenium_count") or 0
+    playwright_count = ti.xcom_pull(task_ids="extraction_group.extract_scraper_playwright", key="playwright_count") or 0
     total_count = ti.xcom_pull(task_ids="extraction_group.merge_raw", key="total_count") or 0
     validation = ti.xcom_pull(task_ids="transform", key="validation") or {}
     
@@ -275,6 +365,8 @@ def calculate_kpis(ti):
         "extraction_reddit": reddit_count,
         "extraction_hackernews": hackernews_count,
         "extraction_bs4": bs4_count,
+        "extraction_selenium": selenium_count,
+        "extraction_playwright": playwright_count,
         "total_raw": total_count,
         "valid_after_clean": validation.get("valid", 0),
         "multimodal": validation.get("multimodal", 0),
@@ -331,12 +423,22 @@ with DAG(
             python_callable=extract_scraper_bs4
         )
         
+        extract_scraper_selenium = PythonOperator(
+            task_id="extract_scraper_selenium",
+            python_callable=extract_scraper_selenium
+        )
+        
+        extract_scraper_playwright = PythonOperator(
+            task_id="extract_scraper_playwright",
+            python_callable=extract_scraper_playwright
+        )
+        
         merge_raw = PythonOperator(
             task_id="merge_raw",
             python_callable=merge_raw_data
         )
         
-        [extract_rss, extract_reddit, extract_hackernews, extract_scraper_bs4] >> merge_raw
+        [extract_rss, extract_reddit, extract_hackernews, extract_scraper_bs4, extract_scraper_selenium, extract_scraper_playwright] >> merge_raw
     
     transform = PythonOperator(
         task_id="transform",
