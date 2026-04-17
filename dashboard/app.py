@@ -262,12 +262,19 @@ def main():
             rejetes = bruts - valides
             st.write(f"Bruts: {bruts} → Valides: {valides} (rejetés: {rejetes})")
             
-            # Par source
-            st.subheader("Par source")
-            source_stats = df_transformed.groupby("source").agg({
-                "title": "count",
-                "is_multimodal": "sum"
-            }).rename(columns={"title": "Total", "is_multimodal": "Multimodal"})
+            # Mapping source -> type d'extraction
+            source_type_map = {
+                "le_figaro": "RSS",
+                "le_monde": "RSS",
+                "nouvel_obs": "RSS",
+                "20_minutes": "RSS",
+                "euronews": "RSS",
+                "breitbart": "RSS",
+                "reddit": "API",
+            }
+            
+            # Ajout colonne type
+            source_stats["Type"] = source_stats.index.map(source_type_map).fillna("RSS")
             st.dataframe(source_stats, width='stretch')
         else:
             st.info("Aucune classification disponible.")
