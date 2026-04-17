@@ -262,23 +262,15 @@ def main():
             rejetes = bruts - valides
             st.write(f"Bruts: {bruts} → Valides: {valides} (rejetés: {rejetes})")
             
-            # Stats par source
-            source_stats = df_transformed["source"].value_counts().reset_index()
-            source_stats.columns = ["Source", "Nombre"]
+            # Stats par source avec type
+            if "type" in df_transformed.columns:
+                source_stats = df_transformed.groupby(["source", "type"]).size().reset_index(name="Nombre")
+                source_stats.columns = ["Source", "Type", "Nombre"]
+            else:
+                source_stats = df_transformed["source"].value_counts().reset_index()
+                source_stats.columns = ["Source", "Nombre"]
+                source_stats["Type"] = "RSS"
             
-            # Mapping source -> type d'extraction
-            source_type_map = {
-                "le_figaro": "RSS",
-                "le_monde": "RSS",
-                "nouvel_obs": "RSS",
-                "20_minutes": "RSS",
-                "euronews": "RSS",
-                "breitbart": "RSS",
-                "reddit": "API",
-            }
-            
-            # Ajout colonne type
-            source_stats["Type"] = source_stats["Source"].map(source_type_map).fillna("RSS")
             st.dataframe(source_stats, width='stretch')
         else:
             st.info("Aucune classification disponible.")
