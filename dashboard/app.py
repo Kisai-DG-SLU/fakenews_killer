@@ -58,18 +58,18 @@ def load_transformed_data():
 
 
 def load_raw_data():
-    """Charge les données brutes."""
-    json_files = list(RAW_DIR.glob("*.json"))
+    """Charge les données brutes du dernier run."""
+    merged_files = list(RAW_DIR.glob("merged_raw_*.json"))
     
-    if not json_files:
+    if not merged_files:
         return pd.DataFrame()
     
-    all_data = []
-    for f in json_files[-5:]:  # Derniers 5 fichiers
-        with open(f, "r", encoding="utf-8") as fp:
-            all_data.extend(json.load(fp))
+    latest = max(merged_files, key=os.path.getmtime)
     
-    return pd.DataFrame(all_data)
+    with open(latest, "r", encoding="utf-8") as fp:
+        data = json.load(fp)
+    
+    return pd.DataFrame(data)
 
 
 def main():
@@ -202,7 +202,7 @@ def main():
                 df_raw = df_raw[df_raw["source"].isin(source_filter)]
             
             st.dataframe(
-                df_raw[["title", "source", "type", "published_at"]].head(50),
+                df_raw[["title", "source", "type", "published_at"]].head(200),
                 width='stretch'
             )
     
