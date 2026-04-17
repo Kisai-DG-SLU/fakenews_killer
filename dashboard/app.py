@@ -242,6 +242,26 @@ def main():
                 ]].head(50),
                 use_container_width=True
             )
+        
+        # Tableau classification
+        st.subheader("Classification des articles")
+        
+        if not df_transformed.empty and "classification" in df_transformed.columns:
+            df_class = df_transformed["classification"].apply(pd.Series)
+            class_counts = df_class["category"].value_counts().reset_index()
+            class_counts.columns = ["Catégorie", "Nombre"]
+            
+            st.dataframe(class_counts, use_container_width=True)
+            
+            # Fiabilité par source
+            st.subheader("Fiabilité par source")
+            if "reliability" in df_class:
+                reliability_data = df_transformed.copy()
+                reliability_data["classification_category"] = df_class["category"]
+                rel_by_source = reliability_data.groupby("source")["classification_category"].value_counts().unstack(fill_value=0)
+                st.dataframe(rel_by_source, use_container_width=True)
+        else:
+            st.info("Aucune classification disponible.")
     
     elif page == "Monitoring":
         st.header("🔍 Monitoring du pipeline")
