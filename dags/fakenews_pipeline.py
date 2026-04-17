@@ -20,7 +20,7 @@ DEFAULT_ARGS = {
     "retry_delay": timedelta(minutes=5),
 }
 
-PROJECT_DIR = "/mnt/prod"
+PROJECT_DIR = "/workspace/fakenews_killer"
 DATA_RAW = f"{PROJECT_DIR}/data/raw"
 DATA_PROCESSED = f"{PROJECT_DIR}/data/processed"
 
@@ -97,8 +97,8 @@ def merge_raw_data(ti):
     import json
     import os
     
-    rss_file = ti.xcom_pull(key="rss_file", task_id="extract_rss")
-    reddit_file = ti.xcom_pull(key="reddit_file", task_id="extract_reddit")
+    rss_file = ti.xcom_pull(task_ids="extraction_group.extract_rss", key="rss_file")
+    reddit_file = ti.xcom_pull(task_ids="extraction_group.extract_reddit", key="reddit_file")
     
     all_articles = []
     
@@ -130,7 +130,7 @@ def transform_data(ti):
     from src.transformation.pipeline import TransformationPipeline
     from src.transformation.cleaner import DataValidator
     
-    merged_file = ti.xcom_pull(key="merged_file", task_id="merge_raw")
+    merged_file = ti.xcom_pull(task_ids="extraction_group.merge_raw", key="merged_file")
     
     if not merged_file:
         logger.error("Aucun fichier à transformer")
@@ -165,7 +165,7 @@ def load_to_database(ti):
     
     from src.transformation.database import DatabaseManager
     
-    transformed_file = ti.xcom_pull(key="transformed_file", task_id="transform")
+    transformed_file = ti.xcom_pull(task_ids="transform", key="transformed_file")
     
     if not transformed_file:
         logger.warning("Aucun fichier à charger")
@@ -188,12 +188,12 @@ def calculate_kpis(ti):
     import sys
     sys.path.insert(0, PROJECT_DIR)
     
-    rss_count = ti.xcom_pull(key="rss_count", task_id="extract_rss") or 0
-    reddit_count = ti.xcom_pull(key="reddit_count", task_id="extract_reddit") or 0
-    total_count = ti.xcom_pull(key="total_count", task_id="merge_raw") or 0
-    validation = ti.xcom_pull(key="validation", task_id="transform") or {}
+    rss_count = ti.xcom_pull(task_ids="extraction_group.extract_rss", key="rss_count") or 0
+    reddit_count = ti.xcom_pull(task_ids="extraction_group.extract_reddit", key="reddit_count") or 0
+    total_count = ti.xcom_pull(task_ids="extraction_group.merge_raw", key="total_count") or 0
+    validation = ti.xcom_pull(task_ids="transform", key="validation") or {}
     
-    start_time = ti.xcom_pull(key="start_time", task_id="start")
+    start_time = ti.xcom_pull(task_ids="start", key="start_time") or None
     if start_time:
         start_dt = datetime.fromisoformat(start_time)
         exec_time = (datetime.now() - start_dt).total_seconds()
