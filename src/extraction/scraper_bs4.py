@@ -1,6 +1,5 @@
 """Scraping de sites d'actualité avec BeautifulSoup."""
 
-import os
 import logging
 import hashlib
 from datetime import datetime

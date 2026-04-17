@@ -171,8 +171,6 @@ def extract_scraper_selenium(ti):
         from selenium import webdriver
         from selenium.webdriver.chrome.options import Options
         from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
         import time
         
         options = Options()
@@ -208,7 +206,7 @@ def extract_scraper_selenium(ti):
                         "extracted_at": datetime.now().isoformat(),
                         "type": "scraped_selenium"
                     })
-            except:
+            except Exception:
                 continue
         
         driver.quit()
@@ -218,7 +216,7 @@ def extract_scraper_selenium(ti):
         if driver:
             try:
                 driver.quit()
-            except:
+            except Exception:
                 pass
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -278,7 +276,7 @@ def extract_scraper_playwright(ti):
                             "extracted_at": datetime.now().isoformat(),
                             "type": "scraped_playwright"
                         })
-                except:
+                except Exception:
                     continue
             
             browser.close()

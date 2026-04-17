@@ -1,6 +1,5 @@
 """Orchestrateur principal pour l'extraction de données."""
 
-import os
 import sys
 import json
 import logging
@@ -13,9 +12,9 @@ from typing import Optional
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.extraction.api_client import NewsAPIAIClient, RedditClient, HackerNewsClient
-from src.extraction.rss_fetcher import RSSFetcher
-from src.extraction.scraper_bs4 import NewsScraper
+from src.extraction.api_client import NewsAPIAIClient, RedditClient, HackerNewsClient  # noqa: E402
+from src.extraction.rss_fetcher import RSSFetcher  # noqa: E402
+from src.extraction.scraper_bs4 import NewsScraper  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -92,7 +91,7 @@ class DataExtractor:
                     limit=5
                 )
                 all_articles.extend(articles)
-            logger.info(f"Scraping: articles ajoutés")
+            logger.info("Scraping terminé")
         
         logger.info(f"Total: {len(all_articles)} articles multimodal")
         return all_articles

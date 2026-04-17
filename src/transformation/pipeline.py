@@ -166,7 +166,7 @@ def main():
     # Stats finales
     validation = DataValidator.validate_batch(transformed)
     
-    print(f"\n✓ Transformation terminée")
+    print("\n✓ Transformation terminée")
     print(f"  - Total: {validation['total']}")
     print(f"  - Valides: {validation['valid']}")
     print(f"  - Multimodaux: {validation['multimodal']}")

@@ -5,9 +5,7 @@ Ce module analyse les articles pour distinguer les opinions controversées
 des contenus potentiellement trompeurs (désinformation).
 """
 
-import re
 import logging
-from typing import Optional
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -290,7 +288,7 @@ class EthicalAnalyzer:
             desinfo_pct=stats["desinformation"]/len(articles)*100 if articles else 0,
             neutre=stats["neutre"],
             neutre_pct=stats["neutre"]/len(articles)*100 if articles else 0,
-            indeterminate=stats["indetermine"],
+            indetermine=stats["indetermine"],
             indet_pct=stats["indetermine"]/len(articles)*100 if articles else 0
         )
         

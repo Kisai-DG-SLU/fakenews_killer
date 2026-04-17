@@ -8,7 +8,7 @@ import streamlit as st
 import pandas as pd
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 # Configuration
@@ -222,15 +222,17 @@ def main():
             col1, col2, col3 = st.columns(3)
             
             with col1:
+                multimodal_count = len(df_transformed[df_transformed.get("is_multimodal", False)])
                 st.metric(
                     "Articles multimodaux",
-                    len(df_transformed[df_transformed.get("is_multimodal", False) == True])
+                    multimodal_count
                 )
             
             with col2:
+                text_only_count = len(df_transformed[not df_transformed.get("is_multimodal", False)])
                 st.metric(
                     "Articles texte seul",
-                    len(df_transformed[df_transformed.get("is_multimodal", False) == False])
+                    text_only_count
                 )
             
             with col3:

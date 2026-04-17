@@ -1,8 +1,6 @@
 """Scraping avec Selenium pour les sites dynamiques (JS)."""
 
-import os
 import logging
-import hashlib
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -107,7 +105,7 @@ class SeleniumScraper:
             try:
                 img_elem = element.find_element(By.CSS_SELECTOR, image_selector)
                 image_url = img_elem.get_attribute("src")
-            except:
+            except Exception:
                 pass
             
             # Extraire le lien
@@ -115,7 +113,7 @@ class SeleniumScraper:
             try:
                 link_elem = element.find_element(By.TAG_NAME, "a")
                 link = link_elem.get_attribute("href")
-            except:
+            except Exception:
                 pass
             
             return {
@@ -140,9 +138,8 @@ def main():
     """Exemple d'utilisation."""
     logging.basicConfig(level=logging.INFO)
     
-    scraper = SeleniumScraper(headless=True)
-    
-    # Exemple: scrape d'un site dynamique
+    # Exemple d'initialisation du scraper
+    # scraper = SeleniumScraper(headless=True)
     # articles = scraper.scrape_dynamic_site(
     #     "https://www.bfmtv.com/",
     #     article_selector="article",
