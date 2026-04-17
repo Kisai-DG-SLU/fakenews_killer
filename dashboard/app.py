@@ -119,7 +119,7 @@ def main():
         
         with col4:
             st.metric(
-                "Taux de réussite",
+                "Taux de conservation",
                 f"{kpis.get('success_rate', 0):.1f}%",
                 delta_color="normal"
             )
@@ -257,7 +257,7 @@ def main():
             
             # Stats nettoyés vs bruts
             st.subheader("Articles nettoyés")
-            st.write(f"Bruts: {int(kpis.get('total_raw', 0))} → Valides: {int(kpis.get('valid_after_clean', 0))} (rejet és: {int(kpis.get('total_raw', 0) - kpis.get('valid_after_clean', 0)))")
+            st.write(f"Bruts: {int(kpis.get('total_raw', 0))} → Valides: {int(kpis.get('valid_after_clean', 0))} (rejetés: {int(kpis.get('total_raw', 0) - kpis.get('valid_after_clean', 0)))")
             
             # Par source
             st.subheader("Par source")
